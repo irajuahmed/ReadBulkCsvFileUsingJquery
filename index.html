@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html>
 <head>
@@ -59,7 +60,9 @@
 
 <input type="file" id="recipientcivilidFile" accept=".csv" class="btn btn-upload">
 <button type="button" id="btnClearCsv" class="btn btn-clear">Clear</button>
-
+<div id="123" class="error-msg">
+	<span id="rowCounter" style="margin-left:10px; font-weight:bold; color:#333;"></span>
+</div>
 <div id="recipientcivilidFileError" class="error-msg"></div>
 <div id="combinedValidationSpan" class="error-msg"></div>
 
@@ -87,6 +90,7 @@ $(function () {
     const $errorMsg = $('#recipientcivilidFileError');
     const $tableBody = $('#csvPreviewTable tbody');
     const $clearBtn = $('#btnClearCsv');
+    const $rowCounter = $('#rowCounter');
 
     $fileInput.on('change', function (e) {
 
@@ -94,6 +98,7 @@ $(function () {
         const file = e.target.files[0];
         $errorMsg.text('');
         $tableBody.empty();
+        $rowCounter.text('');   // reset counter
 
         if (!file) {
             $errorMsg.text('Please select a CSV file.');
@@ -129,7 +134,6 @@ $(function () {
             let rowCount = 0;
             let invalidCivilIdMessage = "";
 
-            // FIX: reduce load to prevent freezing on production domains
             const chunkSize = 50;
 
             function processChunk() {
@@ -157,6 +161,9 @@ $(function () {
 
                     rowCount++;
 
+                    // 🔥 UPDATE COUNTER LIVE
+                    $rowCounter.text("Loaded: " + rowCount + " rows");
+
                     buffer += `
                         <tr>
                             <td style="text-align:center; ${tdStyle}">${rowCount}</td>
@@ -171,7 +178,7 @@ $(function () {
                 index = end;
 
                 if (index < rows.length) {
-                    setTimeout(processChunk, 10);  // allow UI to breathe
+                    setTimeout(processChunk, 10);
                 } else {
                     if (invalidCivilIdMessage !== "") {
                         $errorMsg.text(invalidCivilIdMessage);
@@ -198,10 +205,9 @@ $(function () {
         $tableBody.empty();
         $errorMsg.text("");
         $("#combinedValidationSpan").text("");
+        $rowCounter.text(""); // reset counter
     });
 
 });
-</script>
 
-</body>
-</html>
+</script>
