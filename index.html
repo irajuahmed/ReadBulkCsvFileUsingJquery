@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>CSV Upload</title>
+
+    <style>
+        body { font-family: Arial; padding: 20px; }
+
+        #csvPreviewContainer {
+            max-height: 350px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            margin-top: 10px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        table th, table td {
+            border: 1px solid #ddd;
+            padding: 6px;
+        }
+
+        table th {
+            background: #f7f7f7;
+            position: sticky;
+            top: 0;
+        }
+
+        .error-msg {
+            color: red;
+            font-weight: bold;
+            margin-top: 6px;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            cursor: pointer;
+            border: 1px solid gray;
+            border-radius: 3px;
+        }
+
+        .btn-clear {
+            background: #f2f2f2;
+        }
+
+        .btn-upload {
+            background: #e8f5ff;
+        }
+
+    </style>
+</head>
+<body>
+
+<h3>Upload Recipient CSV</h3>
+
+<input type="file" id="recipientcivilidFile" accept=".csv" class="btn btn-upload">
+<button type="button" id="btnClearCsv" class="btn btn-clear">Clear</button>
+
+<div id="recipientcivilidFileError" class="error-msg"></div>
+<div id="combinedValidationSpan" class="error-msg"></div>
+
+<div id="csvPreviewContainer">
+    <table id="csvPreviewTable">
+        <thead>
+            <tr>
+                <th>SL. No</th>
+                <th>Civil ID</th>
+                <th>Mobile</th>
+                <th>Email</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+</div>
+
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<script>
+$(function () {
+
+    const $fileInput = $('#recipientcivilidFile');
+    const $errorMsg = $('#recipientcivilidFileError');
+    const $tableBody = $('#csvPreviewTable tbody');
+    const $clearBtn = $('#btnClearCsv');
+
+    $fileInput.on('change', function (e) {
+
+        $("#combinedValidationSpan").text("");
+        const file = e.target.files[0];
+        $errorMsg.text('');
+        $tableBody.empty();
+
+        if (!file) {
+            $errorMsg.text('Please select a CSV file.');
+            return;
+        }
+
+        if (!file.name.toLowerCase().endsWith('.csv')) {
+            $errorMsg.text('Only .csv files are allowed.');
+            $fileInput.val('');
+            return;
+        }
+
+        const reader = new FileReader();
+
+        reader.onload = function (event) {
+
+            const csvData = event.target.result.trim();
+            const rows = csvData.split(/\r?\n/);
+
+            if (rows.length <= 1) {
+                $errorMsg.text('The selected CSV file is empty or invalid.');
+                return;
+            }
+
+            // Detect header
+            const header = rows[0].split(',').map(x => x.trim().toLowerCase());
+            const hasHeader =
+                header.includes("civilid") &&
+                header.includes("mobilenumber") &&
+                header.includes("email");
+
+            let index = hasHeader ? 1 : 0;
+            let rowCount = 0;
+            let invalidCivilIdMessage = "";
+
+            // FIX: reduce load to prevent freezing on production domains
+            const chunkSize = 50;
+
+            function processChunk() {
+
+                let buffer = "";
+                const end = Math.min(index + chunkSize, rows.length);
+
+                for (let i = index; i < end; i++) {
+
+                    const cols = rows[i].split(',').map(x => x.trim());
+                    if (cols.length < 3) continue;
+
+                    const civilId = cols[0];
+                    const mobile = cols[1];
+                    const email = cols[2];
+
+                    const civilIdIsValid = /^\d{11,12}$/.test(civilId);
+
+                    if (!civilIdIsValid && invalidCivilIdMessage === "") {
+                        invalidCivilIdMessage =
+                            "Red Marked Row(s) indicate invalid Civil ID. Upload the CSV again after correction.";
+                    }
+
+                    const tdStyle = civilIdIsValid ? "" : "color:red;font-weight:bold";
+
+                    rowCount++;
+
+                    buffer += `
+                        <tr>
+                            <td style="text-align:center; ${tdStyle}">${rowCount}</td>
+                            <td style="${tdStyle}">${civilId}</td>
+                            <td style="${tdStyle}">${mobile}</td>
+                            <td style="${tdStyle}">${email}</td>
+                        </tr>
+                    `;
+                }
+
+                $tableBody.append(buffer);
+                index = end;
+
+                if (index < rows.length) {
+                    setTimeout(processChunk, 10);  // allow UI to breathe
+                } else {
+                    if (invalidCivilIdMessage !== "") {
+                        $errorMsg.text(invalidCivilIdMessage);
+                    }
+                    if (rowCount === 0) {
+                        $errorMsg.text('No valid rows found in the CSV file.');
+                    }
+                }
+            }
+
+            processChunk();
+        };
+
+        reader.onerror = function () {
+            $errorMsg.text('Error reading the file. Please try again.');
+        };
+
+        reader.readAsText(file);
+    });
+
+    // Clear button
+    $clearBtn.on('click', function () {
+        $fileInput.val("");
+        $tableBody.empty();
+        $errorMsg.text("");
+        $("#combinedValidationSpan").text("");
+    });
+
+});
+</script>
+
+</body>
+</html>
